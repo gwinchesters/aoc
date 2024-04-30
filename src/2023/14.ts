@@ -1,4 +1,3 @@
-import { setUncaughtExceptionCaptureCallback } from 'process'
 import Solver from '../common/base'
 
 type Point = [number, number]
