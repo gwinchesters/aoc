@@ -14,11 +14,11 @@ abstract class Solver {
   }
 
   getInput(): string[] {
-    return parseInput(this.year, this.day)
+    return parseInput('main')
   }
 
   getTestInput(): string[] {
-    return parseInput(this.year, 'test')
+    return parseInput('test')
   }
 
   abstract partOne(): string | number
