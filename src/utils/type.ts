@@ -3,3 +3,5 @@ export type Entries<T> = {
 }[keyof T][]
 
 export type Range = [number, number]
+
+export type Tup<T> = [T, T]
