@@ -2,6 +2,7 @@ import { Tup } from '../utils/type'
 import Solver from '../common/base'
 
 type Node = Tup<number>
+// type DoT = 'N' | 'S' | 'E' | 'W'
 
 class Graph {
   nodes: number[][]
@@ -162,73 +163,138 @@ const nodeMap = <T>(defaultNotFound: T): NodeMap<T> => {
 }
 
 const adjIsReachable = (path: Node[], adj: Node) => {
-  const lstThreeNodes = path.slice(-4)
+  // 180 degree turn
+  if (path.slice(-1)[0] == adj) return false
 
-  if (lstThreeNodes.length != 4) {
-    return true
+  // All adj nodes are valid
+  if (path.length <= 3) return true
+
+  type DoT = 'N' | 'S' | 'E' | 'W'
+  const getDoT = ([aR, aC]: Node, [bR, bC]: Node): DoT => {
+    if (aR == bR && aC < bC) return 'E'
+    else if (aR == bR && aC > bC) return 'W'
+    else if (aR < bR && aC == bC) return 'S'
+    else return 'N'
   }
 
-  const [nr, nc] = adj
-  const sameRow = lstThreeNodes.every(([r]) => r == nr)
-  const sameCol = lstThreeNodes.every(([_, c]) => c == nc)
+  const dot = getDoT(path.slice(-2)[0], path.slice(-2)[1])
+  const dotAdj = getDoT(path.slice(-1)[0], adj)
 
-  if (sameRow || sameCol) {
-    return false
+  // 90 degree turn left or right
+  if (['N', 'S'].includes(dot) && ['E', 'W'].includes(dotAdj)) return true
+
+  // 90 degree turn up or down
+  if (['E', 'W'].includes(dot) && ['N', 'S'].includes(dotAdj)) return true
+
+  return !path
+    .slice(-4)
+    .reduce<DoT[]>((acc, node, i, moves) => {
+      if (!moves[i + 1]) return acc
+
+      return [...acc, getDoT(node, moves[i + 1])]
+    }, [])
+    .every((prevDot) => prevDot == dot)
+}
+
+type DoT = 'N' | 'S' | 'E' | 'W'
+const getDoT = ([aR, aC]: Node, [bR, bC]: Node): DoT => {
+  if (aR == bR && aC < bC) return 'E'
+  else if (aR == bR && aC > bC) return 'W'
+  else if (aR < bR && aC == bC) return 'S'
+  else return 'N'
+}
+
+const visitedNodes = () => {
+  const visited = new Map<string, Set<DoT | null>>()
+
+  const toKey = ([r, c]: Node) => `${r}_${c}`
+
+  return {
+    seen: (node: Node, dot: DoT | null) => {
+      const key = toKey(node)
+      if (!visited.has(key)) return false
+
+      return visited.get(key)!.has(dot)
+    },
+    add: (node: Node, dot: DoT | null) => {
+      const key = toKey(node)
+      if (!visited.has(key)) visited.set(key, new Set<DoT>())
+
+      visited.get(key)!.add(dot)
+    },
   }
+}
 
-  return true
+const distanceMap = () => {
+  const d = new Map<string, SearchNode>()
+  const toKey = ([r, c]: Node, dot: DoT | null) => `${r}_${c}_${dot}`
+
+  return {
+    get: (node: Node, dot: DoT | null) => {
+      const key = toKey(node, dot)
+      if (!d.has(key)) return null
+
+      return d.get(key)
+    },
+    getCost: (node: Node, dot: DoT | null) => {
+      const key = toKey(node, dot)
+      if (!d.has(key)) return Number.POSITIVE_INFINITY
+
+      return d.get(key)!.cost
+    },
+    add: (node: Node, dot: DoT | null, sn: SearchNode) => {
+      d.set(toKey(node, dot), sn)
+    },
+  }
 }
 
 interface SearchNode {
   node: Node
   cost: number
   path: Node[]
+  dot: DoT | null
 }
 
 function dijkstra(graph: Graph, source: Node, goal: Node): SearchNode {
-  const distances = nodeMap<SearchNode>({
-    node: [-1, -1],
-    cost: Number.POSITIVE_INFINITY,
-    path: [],
-  })
-  const visited = nodeMap(false)
+  const distances = distanceMap()
+  const visited = visitedNodes()
   const q = priorityQueue<SearchNode>()
-  q.insert({ node: source, cost: 0, path: [source] }, 0)
-  distances.add(source, {
+  q.insert({ node: source, cost: 0, path: [source], dot: null }, 0)
+  distances.add(source, null, {
     node: source,
     cost: 0,
     path: [source],
+    dot: null,
   })
 
   while (!q.isEmpty()) {
-    const { node, cost, path } = q.pop()!
+    const { node, cost, path, dot } = q.pop()!
 
-    if (visited.has(node)) continue
-    visited.add(node, true)
+    if (visited.seen(node, dot)) continue
+    visited.add(node, dot)
 
     for (const adjNode of graph.getAdj(node)) {
       if (!adjIsReachable(path, adjNode)) continue
 
-      if (cost + graph.getNode(adjNode) < distances.get(adjNode).cost) {
+      const adjDoT = getDoT(node, adjNode)
+
+      if (cost + graph.getNode(adjNode) < distances.getCost(adjNode, adjDoT)) {
         const searchNode = {
           node: adjNode,
           cost: cost + graph.getNode(adjNode),
           path: [...path, adjNode],
+          dot: getDoT(node, adjNode),
         }
 
-        distances.add(adjNode, searchNode)
+        distances.add(adjNode, adjDoT, searchNode)
 
         q.insert(searchNode, cost + graph.getNode(adjNode))
       }
     }
   }
 
-  if (distances.has(goal)) {
-    const { cost, path } = distances.get(goal)
-
-    graph.printPath(path)
-
-    console.log(cost)
+  if (distances.get(goal, 'E')) {
+    graph.printPath(distances.get(goal, 'E')!.path)
   }
 
   return q.peek()!
