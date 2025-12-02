@@ -5,10 +5,15 @@ const getSolver = async (year: number, day: number): Promise<Solver> => {
 }
 
 ;(async () => {
-  const [year, day] = process.argv.slice(2).map(Number)
+  const [year, day, part] = process.argv.slice(2).map(Number)
 
   const solver = await getSolver(year, day)
 
-  console.log(`${solver.name} (part 1): ${solver.partOne()}`)
-  console.log(`${solver.name} (part 2): ${solver.partTwo()}`)
+  if (!part || part == 1) {
+    console.log(`${solver.name} (part 1): ${solver.partOne()}`)
+  }
+
+  if (!part || part == 2) {
+    console.log(`${solver.name} (part 2): ${solver.partTwo()}`)
+  }
 })()
